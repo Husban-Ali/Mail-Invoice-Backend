@@ -36,3 +36,7 @@ build/
 
 # Vercel
 .vercel
+
+.env
+.env.local
+.env.example
