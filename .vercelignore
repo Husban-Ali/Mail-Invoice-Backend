@@ -1,0 +1,27 @@
+# Vercel ignore - files not needed for deployment
+node_modules/
+.env
+.env.local
+.git/
+.gitignore
+test-*.js
+*.test.js
+*.spec.js
+data/
+scripts/test/
+postman/
+docs/
+examples/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+README.md
+IMPLEMENTATION_SUMMARY.md
+QUICK_START.md
+README_SCRAPED_DATA.md
+CONNECTION_SUMMARY.md
+FRONTEND_BACKEND_CONNECTION.md
+VERCEL_DEPLOYMENT.md
+deploy-vercel.sh

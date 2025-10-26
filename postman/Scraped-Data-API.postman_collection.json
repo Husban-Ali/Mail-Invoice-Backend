@@ -1,0 +1,241 @@
+{
+  "info": {
+    "name": "Scraped Data API",
+    "description": "API endpoints for managing scraped invoice data",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get All Invoices",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/scraped-data?limit=50&offset=0",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "scraped-data"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "50",
+              "description": "Number of records to return"
+            },
+            {
+              "key": "offset",
+              "value": "0",
+              "description": "Number of records to skip"
+            },
+            {
+              "key": "supplier",
+              "value": "ACME Corp",
+              "description": "Filter by supplier name",
+              "disabled": true
+            },
+            {
+              "key": "status",
+              "value": "Parsed",
+              "description": "Filter by status (Parsed, Error, Pending)",
+              "disabled": true
+            },
+            {
+              "key": "format",
+              "value": "PDF",
+              "description": "Filter by format (PDF, XML, Scan)",
+              "disabled": true
+            },
+            {
+              "key": "startDate",
+              "value": "2025-01-01",
+              "description": "Filter by start date (YYYY-MM-DD)",
+              "disabled": true
+            },
+            {
+              "key": "endDate",
+              "value": "2025-12-31",
+              "description": "Filter by end date (YYYY-MM-DD)",
+              "disabled": true
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Statistics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/scraped-data/stats",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "scraped-data", "stats"],
+          "query": [
+            {
+              "key": "startDate",
+              "value": "2025-01-01",
+              "description": "Filter stats by start date",
+              "disabled": true
+            },
+            {
+              "key": "endDate",
+              "value": "2025-12-31",
+              "description": "Filter stats by end date",
+              "disabled": true
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Suppliers List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/scraped-data/suppliers",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "scraped-data", "suppliers"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Single Invoice",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/scraped-data/:id",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "scraped-data", ":id"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{invoiceId}}",
+              "description": "Invoice ID"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Update Invoice Status",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"Parsed\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/scraped-data/:id/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "scraped-data", ":id", "status"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{invoiceId}}",
+              "description": "Invoice ID"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Invoices",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ids\": [\"invoice-id-1\", \"invoice-id-2\"]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/scraped-data",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "scraped-data"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Export to CSV",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/scraped-data/export/csv?status=Parsed",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "scraped-data", "export", "csv"],
+          "query": [
+            {
+              "key": "status",
+              "value": "Parsed",
+              "description": "Filter by status"
+            },
+            {
+              "key": "supplier",
+              "value": "ACME Corp",
+              "description": "Filter by supplier",
+              "disabled": true
+            },
+            {
+              "key": "startDate",
+              "value": "2025-01-01",
+              "description": "Filter by start date",
+              "disabled": true
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Bulk Update Invoices",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ids\": [\"invoice-id-1\", \"invoice-id-2\"],\n  \"updates\": {\n    \"status\": \"Parsed\",\n    \"format\": \"PDF\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/scraped-data/bulk",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "scraped-data", "bulk"]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "invoiceId",
+      "value": "your-invoice-id-here",
+      "type": "string"
+    }
+  ]
+}
