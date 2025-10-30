@@ -134,13 +134,20 @@ async function setConfig(req, res) {
 async function runNow(req, res) {
   try {
     const userId = getUserId(req);
+    console.log('[retrieval] runNow triggered by userId:', userId);
+    
     let aq = supabase
       .from('accounts')
       .select('*')
       .order('created_at', { ascending: false });
     if (userId) aq = aq.eq('user_id', userId);
     const { data: accounts, error } = await aq;
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      console.error('[retrieval] runNow accounts query error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    console.log('[retrieval] Found', (accounts || []).length, 'accounts to process');
 
     // NEW: Core Flow Implementation - compute sinceDays from backfill.startDate if provided
     const settings = await readSettings(req);
@@ -153,14 +160,19 @@ async function runNow(req, res) {
     })();
     const unseenOnly = true;
 
+    console.log('[retrieval] Config - sinceDays:', sinceDays, 'unseenOnly:', unseenOnly, 'storage:', cfg.storage, 'fileTypes:', cfg.fileTypes);
+
     const results = [];
     for (const acc of (accounts || [])) {
+      console.log('[retrieval] Processing account:', acc.email, 'id:', acc.id);
       const m = acc.meta || {};
       if (!m.host || !m.port || !m.password) {
+        console.log('[retrieval] Account', acc.email, 'missing IMAP meta');
         results.push({ accountId: acc.id, email: acc.email, ok: false, error: 'Missing IMAP meta' });
         continue;
       }
       try {
+        console.log('[retrieval] Fetching from IMAP for account:', acc.email);
         const invoices = await fetchInvoicesViaImap({
           host: m.host,
           port: m.port,
@@ -176,14 +188,29 @@ async function runNow(req, res) {
           storage: cfg.storage,
           fileTypes: Array.isArray(cfg.fileTypes) ? cfg.fileTypes : DEFAULTS.config.fileTypes,
         });
+        console.log('[retrieval] Successfully fetched', invoices.length, 'invoices for', acc.email);
         results.push({ accountId: acc.id, email: acc.email, ok: true, fetched: invoices.length });
         // write a log record if table exists
         try {
           if (logsStorageAvailable) {
-            const { error } = await supabase.from(LOGS_TABLE).insert({ user_id: userId, account_id: acc.id, email: acc.email, status: 'ok', fetched: invoices.length, created_at: new Date().toISOString() });
-            if (error) throw new Error(error.message);
+            const logRecord = { 
+              user_id: userId, 
+              account_id: acc.id, 
+              email: acc.email, 
+              status: 'ok', 
+              fetched: invoices.length, 
+              created_at: new Date().toISOString() 
+            };
+            console.log('[retrieval] Inserting log record:', logRecord);
+            const { error } = await supabase.from(LOGS_TABLE).insert(logRecord);
+            if (error) {
+              console.error('[retrieval] Failed to insert log record:', error);
+              throw new Error(error.message);
+            }
+            console.log('[retrieval] Log record inserted successfully');
           }
         } catch (e) {
+          console.error('[retrieval] Log insertion error:', e.message);
           if (isMissingTableError(e)) {
             logsStorageAvailable = false;
             if (!logsMissingLogged) {
@@ -193,13 +220,27 @@ async function runNow(req, res) {
           }
         }
       } catch (e) {
+        console.error('[retrieval] Error processing account', acc.email, ':', e.message);
         results.push({ accountId: acc.id, email: acc.email, ok: false, error: e.message });
         try {
           if (logsStorageAvailable) {
-            const { error } = await supabase.from(LOGS_TABLE).insert({ user_id: userId, account_id: acc.id, email: acc.email, status: 'error', error: e.message, created_at: new Date().toISOString() });
-            if (error) throw new Error(error.message);
+            const logRecord = { 
+              user_id: userId, 
+              account_id: acc.id, 
+              email: acc.email, 
+              status: 'error', 
+              error: e.message, 
+              created_at: new Date().toISOString() 
+            };
+            console.log('[retrieval] Inserting error log record:', logRecord);
+            const { error } = await supabase.from(LOGS_TABLE).insert(logRecord);
+            if (error) {
+              console.error('[retrieval] Failed to insert error log:', error);
+              throw new Error(error.message);
+            }
           }
         } catch (ee) {
+          console.error('[retrieval] Error log insertion failed:', ee.message);
           if (isMissingTableError(ee)) {
             logsStorageAvailable = false;
             if (!logsMissingLogged) {
@@ -211,27 +252,43 @@ async function runNow(req, res) {
       }
     }
 
+    console.log('[retrieval] runNow completed. Results:', results);
     return res.json({ results });
   } catch (err) {
-    console.error(err);
+    console.error('[retrieval] runNow fatal error:', err);
     return res.status(500).json({ error: err.message });
   }
 }
 
 // GET /api/retrieval/logs
-async function listLogs(_req, res) {
+async function listLogs(req, res) {
   try {
     if (!logsStorageAvailable) {
       return res.json([]);
     }
-    const { data, error } = await supabase
+    const userId = getUserId(req);
+    console.log('[retrieval] listLogs called for userId:', userId);
+    
+    let query = supabase
       .from(LOGS_TABLE)
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50);
-    if (error) throw error;
+    
+    // Filter by user_id if available (respects RLS)
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+    
+    const { data, error } = await query;
+    if (error) {
+      console.error('[retrieval] listLogs error:', error);
+      throw error;
+    }
+    console.log('[retrieval] listLogs returned', (data || []).length, 'logs');
     return res.json(Array.isArray(data) ? data : []);
   } catch (e) {
+    console.error('[retrieval] listLogs exception:', e.message);
     if (isMissingTableError(e)) {
       logsStorageAvailable = false;
       if (!logsMissingLogged) {

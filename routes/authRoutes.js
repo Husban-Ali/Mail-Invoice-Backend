@@ -22,9 +22,34 @@ if (isGoogleConfigured()) {
     res.redirect = (url, ...args) => { console.log('[oauth] redirecting to:', url); return original(url, ...args); };
     next();
   }, passport.authenticate('google', googleOptions));
-  router.get('/google/callback', passport.authenticate('google', { failureRedirect, session: true }), (req, res) => {
-    // On success, redirect to frontend dashboard
-    return res.redirect(`${frontend}/dashboard?auth=google&ok=1`);
+  router.get('/google/callback', passport.authenticate('google', { failureRedirect, session: true }), async (req, res) => {
+    try {
+      // Get user info from Google OAuth
+      const googleProfile = req.user?.profile;
+      if (!googleProfile || !googleProfile.emails || !googleProfile.emails[0]) {
+        console.error('[oauth] No email in Google profile');
+        return res.redirect(failureRedirect);
+      }
+
+      const email = googleProfile.emails[0].value;
+      const name = googleProfile.displayName || email.split('@')[0];
+      
+      // Create or sign in user in Supabase
+      const { getOrCreateGoogleUser } = require('../models/userModel');
+      const session = await getOrCreateGoogleUser(email, name, googleProfile);
+      
+      if (!session || !session.access_token) {
+        console.error('[oauth] Failed to create session');
+        return res.redirect(failureRedirect);
+      }
+
+      // Encode session as base64 to pass via URL
+      const sessionToken = Buffer.from(JSON.stringify(session)).toString('base64');
+      return res.redirect(`${frontend}/dashboard?auth=google&ok=1&token=${sessionToken}`);
+    } catch (error) {
+      console.error('[oauth] Callback error:', error);
+      return res.redirect(failureRedirect);
+    }
   });
 }
 

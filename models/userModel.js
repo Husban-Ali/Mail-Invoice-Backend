@@ -82,4 +82,87 @@ const signInUser = async (email, password) => {
   return data.session;
 };
 
-module.exports = { signUpUser, signInUser };
+const getOrCreateGoogleUser = async (email, name, googleProfile) => {
+  const { supabaseAnon, supabaseAdmin } = getClients();
+  
+  try {
+    // Try to sign in with OAuth provider (Supabase handles Google OAuth)
+    // First, check if user exists
+    if (supabaseAdmin) {
+      // Use admin client to check if user exists
+      const { data: existingUser, error: fetchError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+      
+      if (!existingUser || fetchError) {
+        // User doesn't exist, create them
+        console.log('[oauth] Creating new user for:', email);
+        const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+          email,
+          email_confirm: true,
+          user_metadata: {
+            full_name: name,
+            avatar_url: googleProfile.photos?.[0]?.value,
+            provider: 'google'
+          }
+        });
+        
+        if (createError) {
+          console.error('[oauth] Error creating user:', createError);
+          throw new Error(createError.message);
+        }
+        
+        console.log('[oauth] User created:', newUser.user.id);
+      } else {
+        console.log('[oauth] User exists:', existingUser.user.id);
+      }
+      
+      // Generate a session using admin client
+      const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'magiclink',
+        email
+      });
+      
+      if (sessionError) {
+        console.error('[oauth] Error generating session:', sessionError);
+        throw new Error(sessionError.message);
+      }
+      
+      // Now sign in with anon client to get a proper session
+      const { data: signInData, error: signInError } = await supabaseAnon.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false
+        }
+      });
+      
+      // Instead of OTP, let's use admin to create a session directly
+      // Create a temporary password and sign in
+      const tempPassword = require('crypto').randomBytes(32).toString('hex');
+      
+      // Update user password
+      await supabaseAdmin.auth.admin.updateUserById(
+        existingUser?.user?.id || newUser?.user?.id,
+        { password: tempPassword }
+      );
+      
+      // Sign in with the temporary password
+      const { data: finalSession, error: finalError } = await supabaseAnon.auth.signInWithPassword({
+        email,
+        password: tempPassword
+      });
+      
+      if (finalError) {
+        console.error('[oauth] Error signing in:', finalError);
+        throw new Error(finalError.message);
+      }
+      
+      return finalSession.session;
+    }
+    
+    throw new Error('Admin client not available for OAuth');
+  } catch (error) {
+    console.error('[oauth] getOrCreateGoogleUser error:', error);
+    throw error;
+  }
+};
+
+module.exports = { signUpUser, signInUser, getOrCreateGoogleUser };

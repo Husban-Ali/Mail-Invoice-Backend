@@ -51,6 +51,8 @@ const crypto = require('crypto');
 
 
 async function fetchInvoicesViaImap({ host, port, user, password, tls = true, accountId, userId = null, folder = 'INBOX', unseenOnly = false, sinceDays = null, storage = 'supabase', fileTypes = ['pdf','xml'] }) {
+  console.log('[imap] fetchInvoicesViaImap called with:', { host, port, user, folder, unseenOnly, sinceDays, storage, fileTypes, accountId, userId });
+  
   const config = {
     imap: {
       user,
@@ -64,8 +66,11 @@ async function fetchInvoicesViaImap({ host, port, user, password, tls = true, ac
   };
 
   if (!imaps || !parseMailFn) throw new Error(`IMAP fetch dependencies missing${missingDeps.length ? ': ' + missingDeps.join(', ') : ''}`);
+  
+  console.log('[imap] Connecting to IMAP server...');
   const connection = await imaps.connect(config);
   try {
+    console.log('[imap] Opening mailbox:', folder);
     await connection.openBox(folder);
 
     const searchCriteria = [];
@@ -78,6 +83,9 @@ async function fetchInvoicesViaImap({ host, port, user, password, tls = true, ac
       const sinceDate = new Date(Date.now() - Number(sinceDays) * 24 * 60 * 60 * 1000);
       searchCriteria.push(['SINCE', sinceDate]);
     }
+    
+    console.log('[imap] Search criteria:', JSON.stringify(searchCriteria));
+    
     const fetchOptions = {
       bodies: [''],
       struct: true,
@@ -85,6 +93,7 @@ async function fetchInvoicesViaImap({ host, port, user, password, tls = true, ac
     };
 
     const results = await connection.search(searchCriteria, fetchOptions);
+    console.log('[imap] Found', results.length, 'emails matching criteria');
     const savedInvoices = [];
 
     for (const res of results) {
@@ -92,8 +101,12 @@ async function fetchInvoicesViaImap({ host, port, user, password, tls = true, ac
       if (!raw || !raw.body) continue;
 
       const mail = await parseMailFn(Buffer.from(raw.body, 'utf8'));
-      if (!mail.attachments || mail.attachments.length === 0) continue;
+      if (!mail.attachments || mail.attachments.length === 0) {
+        console.log('[imap] Email has no attachments, skipping');
+        continue;
+      }
 
+      console.log('[imap] Processing email with', mail.attachments.length, 'attachment(s)');
       for (const attachment of mail.attachments) {
         // Accept attachments by configured file types (pdf, xml)
         const ct = (attachment.contentType || '').toLowerCase();
@@ -292,9 +305,11 @@ async function fetchInvoicesViaImap({ host, port, user, password, tls = true, ac
         }
 
         savedInvoices.push(inserted);
+        console.log('[imap] ✅ Saved invoice:', inserted.id, 'filename:', filename);
       }
     }
 
+    console.log('[imap] Completed processing. Saved', savedInvoices.length, 'invoice(s)');
     return savedInvoices;
   } finally {
     try { await connection.end(); } catch (e) { /* ignore */ }
