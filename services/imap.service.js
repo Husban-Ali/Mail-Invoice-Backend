@@ -1,4 +1,3 @@
-// NEW: Core Flow Implementation - enhanced IMAP intake with XML support, dedupe, and storage adapter
 
 async function saveConnectedAccount({ user, provider = 'imap', status = 'pending', meta = {}, }) {
   const now = new Date().toISOString();
